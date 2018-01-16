@@ -9,7 +9,7 @@ Todo/Bugs:
 * Fix the above
 
 Usage:
-* sudo ./beacon <url-without-protocol>
+* sudo ./beacon url-without-protocol
 
 Example:
 * sudo ./beacon www.lwn.net
