@@ -20,17 +20,12 @@
  */
 
 #include <stdio.h>
-#include <errno.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <string.h>
-#include <getopt.h>
-#include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <signal.h>
 
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
@@ -119,6 +114,8 @@ int i;
 uint8_t ogf=OGF_LE_CTL; // LE
 uint16_t ocf=OCF_LE_SET_ADVERTISING_DATA; // LE_Set_Advertising_Data
 
+memset(data, 0, 32);
+
 data[0]=31; // Total length
 data[1]=0x02; // Length, next
 data[2]=0x01; // Flags
@@ -184,8 +181,6 @@ if (argc!=2) {
 	return 1;
 }
 printf("%d %s\n", argc, argv[1]);
-
-memset(data, 0, 32);
 
 dev_id = hci_get_route(NULL);
 if (dev_id<0) {
