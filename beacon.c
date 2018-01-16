@@ -108,7 +108,7 @@ err = hci_le_set_scan_enable(dev, 0x00, filter_dup, 1000);
 }
 #endif
 
-int beacon(int dev, int tx, char *url)
+int beacon(int dev, int8_t tx, const char *url)
 {
 char data[32]; // XXX: Or le_set_advertising_data_cp hci.h
 int i;
