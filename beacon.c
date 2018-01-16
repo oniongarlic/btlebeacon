@@ -108,6 +108,22 @@ err = hci_le_set_scan_enable(dev, 0x00, filter_dup, 1000);
 }
 #endif
 
+int disable_scan(int dev)
+{
+struct hci_dev_req dr;
+int ctl;
+
+dr.dev_id=dev;
+dr.dev_opt=SCAN_DISABLED;
+
+if ((ctl = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)) < 0) {
+	perror("Can't open HCI socket.");
+	return -1;
+}
+
+return ioctl(ctl, HCISETSCAN, (unsigned long) &dr);
+}
+
 int beacon(int dev, int8_t tx, const char *url)
 {
 char data[32]; // XXX: Or le_set_advertising_data_cp hci.h
@@ -194,6 +210,12 @@ if (dev<0) {
 	perror("hci_open_dev");
 	return 1;
 }
+if (disable_scan(0)<0) {
+	perror("disable_scan");
+	return 1;
+}
+
+hci_le_set_scan_enable(dev, 0x00, 1, 1000);
 
 setup_filter(dev);
 
