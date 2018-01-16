@@ -1,7 +1,8 @@
 /*
- *  Eddystone Bluetooth LE Beacon setup 
+ *  Eddystone Bluetooth LE Beacon setup
  *
  *  Copyright (C) 2017 Kaj-Michael Lang
+ *  Parts peeked from Bluez hcitool
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
