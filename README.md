@@ -1,7 +1,7 @@
 Setup Eddystone LE Beacon
 =========================
 
-Advertises a url as an Eddystone beacon
+Advertises a URL as an Eddystone beacon, https://github.com/google/eddystone/
 
 Todo/Bugs:
 * Assumes https:// prefix
