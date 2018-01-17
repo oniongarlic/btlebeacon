@@ -139,6 +139,40 @@ if (hci_send_cmd(dev, ogf, ocf, sizeof(le_set_advertising_data_cp), frame) < 0) 
 return 0;
 }
 
+int find_prefix(const char *url)
+{
+int i=0;
+while (eddystone_url_prefix[i]!=NULL) {
+	size_t l=strlen(eddystone_url_prefix[i]);
+	if (strncmp(eddystone_url_prefix[i], url, l)==0) {
+        	return i;
+	}
+	i++;
+}
+
+return -1;
+}
+
+int find_suffix(const char *url)
+{
+int i=0;
+
+while (eddystone_url_suffix[i]!=NULL) {
+	size_t l=strlen(eddystone_url_suffix[i]);
+	if (strncmp(eddystone_url_suffix[i], url, l)==0) {
+		return i;
+	}
+	i++;
+}
+
+return -1;
+}
+
+int encode_url(const char *url)
+{
+return 0;
+}
+
 void eddystone_frame_prepare(le_set_advertising_data_cp *f, uint8_t type)
 {
 memset(f->data, 0, sizeof(f->data));
