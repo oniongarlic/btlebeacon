@@ -284,6 +284,12 @@ read_event(dev);
 return 0;
 }
 
+void usage()
+{
+printf("beacon url [nid bid]\n");
+printf("NID must be 10 characters, BID must be 6 characters\n");
+}
+
 int main(int argc, char *argv[])
 {
 int dev_id, dev;
@@ -291,11 +297,19 @@ int oneshot=0;
 char *nid="0123456789";
 char *bid="abcdef";
 
-if (argc!=2) {
-	printf("URL argument not given\n");
+if (argc<2) {
+	usage();
 	return 1;
 }
-printf("%d %s\n", argc, argv[1]);
+if (argc==4 && strlen(argv[2])==10 && strlen(argv[3])==6) {
+	nid=argv[2];
+	bid=argv[3];
+} else if (argc==3) {
+	usage();
+	return 1;
+}
+
+printf("URL: %s\nNID: %s\nBID: %s\n", argv[1], nid, bid);
 
 dev_id = hci_get_route(NULL);
 if (dev_id<0) {
@@ -329,6 +343,7 @@ while(1 || !oneshot) {
 	if (eddystone_tlm_beacon(dev)<0)
 		break;
 	sleep(1);
+
 	sec_cnt+=20;
 	adv_cnt++;
 }
