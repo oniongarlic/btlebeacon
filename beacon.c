@@ -286,8 +286,10 @@ return 0;
 
 void usage()
 {
-printf("beacon url [nid bid]\n");
+printf("beacon url [nid bid]\n\n");
+printf("URL assumes https:// and must be max 17 characters\n");
 printf("NID must be 10 characters, BID must be 6 characters\n");
+printf("Example: www.example.ex 0123456789 abcdef\n\n");
 }
 
 int main(int argc, char *argv[])
@@ -305,6 +307,10 @@ if (argc==4 && strlen(argv[2])==10 && strlen(argv[3])==6) {
 	nid=argv[2];
 	bid=argv[3];
 } else if (argc==3) {
+	usage();
+	return 1;
+}
+if (strlen(argv[1])>17) {
 	usage();
 	return 1;
 }
