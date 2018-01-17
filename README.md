@@ -1,15 +1,23 @@
 Setup Eddystone LE Beacon
 =========================
 
-Advertises a URL as an Eddystone beacon, https://github.com/google/eddystone/
+Eddystone beacon. Support URL, UID and TLM frames.
+
+Advertises a URL as an Eddystone beacon with support for telemetry (TLM) and UID frames.
+
+See https://github.com/google/eddystone/ for details about Eddystone.
 
 Todo/Bugs:
-* Assumes https:// prefix
-* Does not encode suffix
-* Fix the above
+* Assumes https:// prefix, url must be without
+* Does not encode suffix yet (FIXME)
+* NID and BID are used as strings
+* NID and BID defaults to 0123456789 ABCDEF
+* UID can not be set
+* Needs root, use sudo if needed
 
 Usage:
-* sudo ./beacon <url-without-protocol>
+* ./beacon url [nid bid]
 
-Example:
-* sudo ./beacon www.lwn.net
+Examples:
+* ./beacon www.tal.org 
+* ./beacon www.tal.org 0123456789 ABCDEF
