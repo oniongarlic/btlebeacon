@@ -126,31 +126,31 @@ return ioctl(ctl, HCISETSCAN, (unsigned long) &dr);
 
 int beacon(int dev, int8_t tx, const char *url)
 {
-char data[32]; // XXX: Or le_set_advertising_data_cp hci.h
+le_set_advertising_data_cp f;
 int i;
 uint8_t ogf=OGF_LE_CTL; // LE
 uint16_t ocf=OCF_LE_SET_ADVERTISING_DATA; // LE_Set_Advertising_Data
 
-memset(data, 0, 32);
+memset(f.data, 0, sizeof(f.data));
 
-data[0]=31; // Total length
-data[1]=0x02; // Length, next
-data[2]=0x01; // Flags
-data[3]=0x06; // Flag data
-data[4]=0x03; // Length, next
-data[5]=0x03;
-data[6]=0xAA; // UUID
-data[7]=0xFE; // UUID
-data[8]=31-8; // Beacon data length
-data[9]=0x16; //
-data[10]=0xAA; // UUID
-data[11]=0xFE; // UUID
-data[12]=0x10; // Eddystone URL Type
-data[13]=tx; // TX power
-data[14]=0x03; // URL Scheme (https://)
+f.length=31; // Total length
+f.data[0]=0x02; // Length, next
+f.data[1]=0x01; // Flags
+f.data[2]=0x06; // Flag data
+f.data[3]=0x03; // Length, next
+f.data[4]=0x03;
+f.data[5]=0xAA; // UUID
+f.data[6]=0xFE; // UUID
+f.data[7]=31-8; // Beacon data length
+f.data[8]=0x16; //
+f.data[9]=0xAA; // UUID
+f.data[10]=0xFE; // UUID
+f.data[11]=0x10; // Eddystone URL Type
+f.data[12]=tx; // TX power
+f.data[13]=0x03; // URL Scheme (https://)
 
-for (i=0;i<strlen(url) && i<19;i++) {
-	data[i+15]=url[i];
+for (i=0;i<strlen(url) && i<18;i++) {
+	f.data[i+14]=url[i];
 }
 
 if (i==18) {
@@ -158,10 +158,10 @@ if (i==18) {
 	return -2;
 }
 
-data[8]=6+i;
+f.data[7]=6+i;
 
-printf("Setting beacon to advertise: %d %s\n", i, url);
-if (hci_send_cmd(dev, ogf, ocf, 31, data) < 0) {
+printf("Setting beacon to advertise: %ld %d %s \n", sizeof(f), i, url);
+if (hci_send_cmd(dev, ogf, ocf, sizeof(f), (void*)&f) < 0) {
 	perror("Send failed");
 	return -1;
 }
