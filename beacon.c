@@ -32,6 +32,9 @@
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_lib.h>
 
+int sec_cnt=0;
+int adv_cnt=0;
+
 static const char* eddystone_url_prefix[] = {
     "http://www.",
     "https://www.",
@@ -124,12 +127,68 @@ if ((ctl = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)) < 0) {
 return ioctl(ctl, HCISETSCAN, (unsigned long) &dr);
 }
 
-int beacon(int dev, int8_t tx, const char *url)
+int advertise_frame(int dev, le_set_advertising_data_cp *frame)
+{
+uint8_t ogf=OGF_LE_CTL; // LE
+uint16_t ocf=OCF_LE_SET_ADVERTISING_DATA; // LE_Set_Advertising_Data
+
+if (hci_send_cmd(dev, ogf, ocf, sizeof(le_set_advertising_data_cp), frame) < 0) {
+	perror("hci_send_cmd failed");
+	return -1;
+}
+return 0;
+}
+
+void eddystone_frame_prepare(le_set_advertising_data_cp *f, uint8_t type)
+{
+memset(f->data, 0, sizeof(f->data));
+
+f->length=31; // Total length
+f->data[0]=0x02; // Length, next
+f->data[1]=0x01; // Flags
+f->data[2]=0x06; // Flag data
+f->data[3]=0x03; // Length, next
+f->data[4]=0x03;
+f->data[5]=0xAA; // UUID
+f->data[6]=0xFE; // UUID
+f->data[7]=0x00; // Service Data Length
+f->data[8]=0x16; //
+f->data[9]=0xAA; // UUID
+f->data[10]=0xFE; // UUID
+f->data[11]=type; // Eddystone Frame Type
+}
+
+int eddystone_tlm_beacon(int dev)
+{
+le_set_advertising_data_cp f;
+
+eddystone_frame_prepare(&f, 0x20);
+
+f.data[7]=0x11; // Total length
+
+f.data[12]=0x00; // TLM Frame Version
+f.data[13]=0x00; // VBatt1
+f.data[14]=0x00; // VBatt2
+f.data[15]=0x80; // Temp1
+f.data[16]=0x00; // Temp2
+f.data[17]=(uint8_t)(adv_cnt>>24); // Advertising PDU count
+f.data[18]=(uint8_t)(adv_cnt>>16);
+f.data[19]=(uint8_t)(adv_cnt>>8);
+f.data[20]=(uint8_t)(adv_cnt>>0);
+f.data[21]=(uint8_t)(sec_cnt>>24); // Time since power-on or reboot
+f.data[22]=(uint8_t)(sec_cnt>>16);
+f.data[23]=(uint8_t)(sec_cnt>>8);
+f.data[24]=(uint8_t)(sec_cnt>>0);
+
+printf("TLM Frame: %d %d\n", adv_cnt, sec_cnt);
+
+return advertise_frame(dev, &f);
+}
+
+int eddystone_url_beacon(int dev, int8_t tx, const char *url)
 {
 le_set_advertising_data_cp f;
 int i;
-uint8_t ogf=OGF_LE_CTL; // LE
-uint16_t ocf=OCF_LE_SET_ADVERTISING_DATA; // LE_Set_Advertising_Data
 
 memset(f.data, 0, sizeof(f.data));
 
@@ -160,11 +219,8 @@ if (i==18) {
 
 f.data[7]=6+i;
 
-printf("Setting beacon to advertise: %ld %d %s \n", sizeof(f), i, url);
-if (hci_send_cmd(dev, ogf, ocf, sizeof(f), (void*)&f) < 0) {
-	perror("Send failed");
-	return -1;
-}
+printf("URL Frame: %s\n", url);
+advertise_frame(dev, &f);
 
 read_event(dev);
 
@@ -192,6 +248,7 @@ return 0;
 int main(int argc, char *argv[])
 {
 int dev_id, dev;
+int oneshot=0;
 
 if (argc!=2) {
 	printf("URL argument not given\n");
@@ -219,9 +276,18 @@ hci_le_set_scan_enable(dev, 0x00, 1, 1000);
 
 setup_filter(dev);
 
-if (beacon(dev, 0xed, argv[1])==0)
-	enable_advertise(dev, 1);
+enable_advertise(dev, 1);
 
+while(1 || !oneshot) {
+	if (eddystone_url_beacon(dev, 0xed, argv[1])<0)
+		break;
+	sleep(1);
+	if (eddystone_tlm_beacon(dev)<0)
+		break;
+	sleep(1);
+	sec_cnt+=20;
+	adv_cnt++;
+}
 
 hci_close_dev(dev);
 }
