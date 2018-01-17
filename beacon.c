@@ -158,6 +158,45 @@ f->data[10]=0xFE; // UUID
 f->data[11]=type; // Eddystone Frame Type
 }
 
+int eddystone_uid_beacon(int dev, uint8_t tx, const char *nid, const char *bid)
+{
+le_set_advertising_data_cp f;
+
+if (strlen(nid)!=10)
+	return -1;
+
+if (strlen(bid)!=6)
+	return -1;
+
+eddystone_frame_prepare(&f, 0x00);
+
+f.data[7]=0x17; // Service Data Length
+
+f.data[12]=tx;
+
+f.data[13]=nid[0];
+f.data[14]=nid[1];
+f.data[15]=nid[2];
+f.data[16]=nid[3];
+f.data[17]=nid[4];
+f.data[18]=nid[5];
+f.data[19]=nid[6];
+f.data[20]=nid[7];
+f.data[21]=nid[8];
+f.data[22]=nid[9];
+
+f.data[23]=bid[0];
+f.data[24]=bid[1];
+f.data[25]=bid[2];
+f.data[26]=bid[3];
+f.data[27]=bid[4];
+f.data[28]=bid[5];
+
+printf("UID Frame: %s %s\n", nid, bid);
+
+return advertise_frame(dev, &f);
+}
+
 int eddystone_tlm_beacon(int dev)
 {
 le_set_advertising_data_cp f;
@@ -249,6 +288,8 @@ int main(int argc, char *argv[])
 {
 int dev_id, dev;
 int oneshot=0;
+char *nid="0123456789";
+char *bid="abcdef";
 
 if (argc!=2) {
 	printf("URL argument not given\n");
@@ -280,6 +321,9 @@ enable_advertise(dev, 1);
 
 while(1 || !oneshot) {
 	if (eddystone_url_beacon(dev, 0xed, argv[1])<0)
+		break;
+	sleep(1);
+	if (eddystone_uid_beacon(dev, 0xed, nid, bid)<0)
 		break;
 	sleep(1);
 	if (eddystone_tlm_beacon(dev)<0)
