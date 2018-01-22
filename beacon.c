@@ -157,6 +157,25 @@ if (hci_send_cmd(dev, ogf, ocf, sizeof(le_set_advertising_data_cp), frame) < 0) 
 return 0;
 }
 
+int set_advertising(int dev, uint16_t min_intv, uint16_t max_intv)
+{
+uint8_t ogf=OGF_LE_CTL; // LE
+uint16_t ocf=OCF_LE_SET_ADVERTISING_PARAMETERS;
+
+le_set_advertising_parameters_cp frame;
+
+memset(&frame, 0, sizeof(frame));
+frame.min_interval=htobs(min_intv);
+frame.max_interval=htobs(max_intv);
+frame.advtype=0x03;
+
+if (hci_send_cmd(dev, ogf, ocf, LE_SET_ADVERTISING_PARAMETERS_CP_SIZE, &frame) < 0) {
+	perror("hci_send_cmd failed");
+	return -1;
+}
+return 0;
+}
+
 int find_prefix(const char *url)
 {
 int i=0;
@@ -392,6 +411,9 @@ ut=time(NULL);
 hci_le_set_scan_enable(dev, 0x00, 1, 1000);
 
 setup_filter(dev);
+
+// In 0.625ms intervals?
+set_advertising(dev, 0x00A0, 0x0200);
 
 enable_advertise(dev, 1);
 
