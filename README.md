@@ -13,7 +13,9 @@ Todo/Bugs:
 * NID and BID are used as strings
 * NID and BID defaults to 0123456789 ABCDEF
 * UID can not be set
-* Needs root, use sudo if needed
+
+Bluetooth LE requires root or capabilities set:
+* Run "make setcap" to set capabilities flags on the binary so sudo/root is not needed
 
 Usage:
 * ./beacon url [nid bid]
