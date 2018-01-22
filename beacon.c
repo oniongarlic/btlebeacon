@@ -28,6 +28,8 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include <time.h>
+
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_lib.h>
@@ -321,6 +323,7 @@ int dev_id, dev;
 int oneshot=0;
 char *nid="0123456789";
 char *bid="abcdef";
+time_t ut;
 
 if (argc<2) {
 	usage();
@@ -356,6 +359,8 @@ if (disable_scan(0)<0) {
 	return 1;
 }
 
+ut=time(NULL);
+
 hci_le_set_scan_enable(dev, 0x00, 1, 1000);
 
 setup_filter(dev);
@@ -373,7 +378,7 @@ while(1 || !oneshot) {
 		break;
 	sleep(1);
 
-	sec_cnt+=20;
+	sec_cnt=time(NULL)-ut;;
 	adv_cnt++;
 }
 
