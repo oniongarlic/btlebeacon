@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
@@ -113,20 +114,35 @@ err = hci_le_set_scan_enable(dev, 0x00, filter_dup, 1000);
 }
 #endif
 
-int disable_scan(int dev)
+int open_bt_socket()
+{
+int ctl;
+
+if ((ctl = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)) < 0) {
+	return -1;
+}
+return ctl;
+}
+
+int disable_scan(int ctl, int dev)
 {
 struct hci_dev_req dr;
-int ctl;
 
 dr.dev_id=dev;
 dr.dev_opt=SCAN_DISABLED;
 
-if ((ctl = socket(AF_BLUETOOTH, SOCK_RAW, BTPROTO_HCI)) < 0) {
-	perror("Can't open HCI socket.");
-	return -1;
+return ioctl(ctl, HCISETSCAN, (unsigned long) &dr);
 }
 
-return ioctl(ctl, HCISETSCAN, (unsigned long) &dr);
+int enable_hci(int ctl, int dev)
+{
+if (ioctl(ctl, HCIDEVUP, dev) < 0) {
+	/* Already Up, ignore */
+	if (errno == EALREADY)
+		return 0;
+	return errno;
+}
+return 0;
 }
 
 int advertise_frame(int dev, le_set_advertising_data_cp *frame)
@@ -319,7 +335,7 @@ printf("Example: www.example.ex 0123456789 abcdef\n\n");
 
 int main(int argc, char *argv[])
 {
-int dev_id, dev;
+int dev_id, dev, ctl;
 int oneshot=0;
 char *nid="0123456789";
 char *bid="abcdef";
@@ -343,19 +359,31 @@ if (strlen(argv[1])>17) {
 
 printf("URL: %s\nNID: %s\nBID: %s\n", argv[1], nid, bid);
 
-dev_id = hci_get_route(NULL);
-if (dev_id<0) {
-	perror("hci_get_route");
-	return 1;
-}
-
 dev = hci_open_dev(dev_id);
 if (dev<0) {
 	perror("hci_open_dev");
 	return 1;
 }
-if (disable_scan(0)<0) {
+
+ctl=open_bt_socket(dev);
+if (ctl<0) {
+	perror("socket");
+	return 1;
+}
+
+if (enable_hci(ctl, 0)<0) {
+	perror("bring up");
+	return 1;
+}
+
+if (disable_scan(ctl, 0)<0) {
 	perror("disable_scan");
+	return 1;
+}
+
+dev_id = hci_get_route(NULL);
+if (dev_id<0) {
+	perror("hci_get_route");
 	return 1;
 }
 
