@@ -31,12 +31,26 @@
 
 #include <time.h>
 
+#include <signal.h>
+
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_lib.h>
 
+#define SETSIG(sa, sig, fun, flags) \
+	do { \
+		sa.sa_handler = fun; \
+		sa.sa_flags = flags; \
+		sigemptyset(&sa.sa_mask); \
+		sigaction(sig, &sa, NULL); \
+	} while(0)
+
+
 int sec_cnt=0;
 int adv_cnt=0;
+
+static struct sigaction sa_int;
+static int sigint_c=0;
 
 static const char* eddystone_url_prefix[] = {
     "http://www.",
@@ -64,6 +78,12 @@ static const char* eddystone_url_suffix[] = {
     ".gov",
     NULL
 };
+
+void sig_handler_sigint(int i)
+{
+sigint_c++;
+fprintf(stderr, "SIGINT: %d\n", sigint_c);
+}
 
 int setup_filter(int dev)
 {
@@ -376,6 +396,8 @@ if (strlen(argv[1])>17) {
 	return 1;
 }
 
+SETSIG(sa_int, SIGINT, sig_handler_sigint, SA_RESTART);
+
 printf("URL: %s\nNID: %s\nBID: %s\n", argv[1], nid, bid);
 
 dev = hci_open_dev(dev_id);
@@ -430,7 +452,12 @@ while(1 || !oneshot) {
 
 	sec_cnt=time(NULL)-ut;;
 	adv_cnt++;
+
+	if (sigint_c>0)
+		break;
 }
+
+enable_advertise(dev, 0);
 
 hci_close_dev(dev);
 }
