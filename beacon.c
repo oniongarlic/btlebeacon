@@ -243,10 +243,10 @@ uint i,j=0;
 size_t l=0;
 
 int8_t x=find_prefix(url, &l);
-if (x>0) {
-	out[j]=x;
-	j++;
-}
+if (x<0)
+	return -3;
+out[j]=x;
+j++;
 
 for (i=l;i<ulen;i++) {
 	if (url[i]>=0x00 && url[i]<=0x22)
@@ -255,7 +255,7 @@ for (i=l;i<ulen;i++) {
 		return -2;
 	if (j>0 && (x=find_suffix(url+i, &l))>0) {
 		out[j]=x;
-		i=i+l;
+		i=i+l-1;
 	} else {
 		out[j]=url[i];
 	}
@@ -439,6 +439,9 @@ if (eurll==-1) {
 	return 3;
 } else if (eurll==-2) {
 	usage("URL contains invalid characters");
+	return 4;
+} else if (eurll==-3) {
+	usage("URL prefix is invalid, valid are http:// and https://");
 	return 4;
 }
 
