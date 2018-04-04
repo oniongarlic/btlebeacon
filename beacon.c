@@ -52,6 +52,9 @@ int adv_cnt=0;
 static struct sigaction sa_int;
 static int sigint_c=0;
 
+static char eurl[18];
+static int8_t eurll=0;
+
 static const char* eddystone_url_prefix[] = {
     "http://www.",
     "https://www.",
@@ -196,12 +199,13 @@ if (hci_send_cmd(dev, ogf, ocf, LE_SET_ADVERTISING_PARAMETERS_CP_SIZE, &frame) <
 return 0;
 }
 
-int find_prefix(const char *url)
+int8_t find_prefix(const char *url, size_t *len)
 {
-int i=0;
+int8_t i=0;
 while (eddystone_url_prefix[i]!=NULL) {
 	size_t l=strlen(eddystone_url_prefix[i]);
 	if (strncmp(eddystone_url_prefix[i], url, l)==0) {
+		*len=l;
         	return i;
 	}
 	i++;
@@ -210,13 +214,14 @@ while (eddystone_url_prefix[i]!=NULL) {
 return -1;
 }
 
-int find_suffix(const char *url)
+int find_suffix(const char *url,  size_t *len)
 {
-int i=0;
+int8_t i=0;
 
 while (eddystone_url_suffix[i]!=NULL) {
 	size_t l=strlen(eddystone_url_suffix[i]);
 	if (strncmp(eddystone_url_suffix[i], url, l)==0) {
+		*len=l;
 		return i;
 	}
 	i++;
@@ -225,9 +230,44 @@ while (eddystone_url_suffix[i]!=NULL) {
 return -1;
 }
 
-int encode_url(const char *url)
+/**
+ * Encodes the given url to the beacon format with prefix & suffix shortcuts.
+ *
+ * It also checks that all the characters are inside the valid ASCII ranges.
+ *
+ */
+int8_t encode_url(const char *url, char *out)
 {
-return 0;
+size_t ulen=strlen(url);
+uint i,j=0;
+size_t l=0;
+
+int8_t x=find_prefix(url, &l);
+if (x>0) {
+	out[j]=x;
+	j++;
+}
+
+for (i=l;i<ulen;i++) {
+	if (url[i]>=0x00 && url[i]<=0x22)
+		return -2;
+	if (url[i]>=0x7f && url[i]<=0xff)
+		return -2;
+	if (j>0 && (x=find_suffix(url+i, &l))>0) {
+		out[j]=x;
+		i=i+l;
+	} else {
+		out[j]=url[i];
+	}
+	j++;
+	if (j>17)
+		return -1;
+}
+
+//for (i=0;i<j;i++)
+//	printf("%02x\n", out[i]);
+
+return j;
 }
 
 void eddystone_frame_prepare(le_set_advertising_data_cp *f, uint8_t type)
@@ -304,7 +344,7 @@ printf("TLM Frame: %d %d\n", adv_cnt, sec_cnt);
 return advertise_frame(dev, &f);
 }
 
-int eddystone_url_beacon(int dev, int8_t tx, const char *url)
+int eddystone_url_beacon(int dev, int8_t tx, const char *eurl, int8_t len)
 {
 le_set_advertising_data_cp f;
 int i;
@@ -325,20 +365,16 @@ f.data[9]=0xAA; // UUID
 f.data[10]=0xFE; // UUID
 f.data[11]=0x10; // Eddystone URL Type
 f.data[12]=tx; // TX power
-f.data[13]=0x03; // URL Scheme (https://)
+// f.data[13]=0x03; // https://
 
-for (i=0;i<strlen(url) && i<18;i++) {
-	f.data[i+14]=url[i];
+for (i=0;i<len && i<18;i++) {
+	f.data[i+13]=eurl[i];
 }
 
-if (i==18) {
-	printf("URL too long\n");
-	return -2;
-}
+f.data[7]=6+len-1; // adjust for prefix
 
-f.data[7]=6+i;
+printf("URL Frame: %d\n", len);
 
-printf("URL Frame: %s\n", url);
 advertise_frame(dev, &f);
 
 read_event(dev);
@@ -364,8 +400,11 @@ read_event(dev);
 return 0;
 }
 
-void usage()
+void usage(const char *msg)
 {
+if (msg)
+	printf("Error: %s\n", msg);
+
 printf("beacon url [nid bid]\n\n");
 printf("URL assumes https:// and must be max 17 characters\n");
 printf("NID must be 10 characters, BID must be 6 characters\n");
@@ -374,31 +413,38 @@ printf("Example: www.example.ex 0123456789 abcdef\n\n");
 
 int main(int argc, char *argv[])
 {
-int dev_id, dev, ctl;
+int dev_id, dev, ctl, r;
 int oneshot=0;
 char *nid="0123456789";
 char *bid="abcdef";
 time_t ut;
 
 if (argc<2) {
-	usage();
+	usage("Missing all arguments");
 	return 1;
 }
 if (argc==4 && strlen(argv[2])==10 && strlen(argv[3])==6) {
 	nid=argv[2];
 	bid=argv[3];
 } else if (argc==3) {
-	usage();
-	return 1;
+	usage("Meh");
+	return 2;
 }
-if (strlen(argv[1])>17) {
-	usage();
-	return 1;
+
+memset(eurl, 0, sizeof(eurl));
+eurll=encode_url(argv[1], eurl);
+
+if (eurll==-1) {
+	usage("URL is too long");
+	return 3;
+} else if (eurll==-2) {
+	usage("URL contains invalid characters");
+	return 4;
 }
 
 SETSIG(sa_int, SIGINT, sig_handler_sigint, SA_RESTART);
 
-printf("URL: %s\nNID: %s\nBID: %s\n", argv[1], nid, bid);
+printf("URL(%d): %s\nNID: %s\nBID: %s\n", eurll, argv[1], nid, bid);
 
 dev = hci_open_dev(dev_id);
 if (dev<0) {
@@ -440,7 +486,7 @@ set_advertising(dev, 0x00A0, 0x0200);
 enable_advertise(dev, 1);
 
 while(1 || !oneshot) {
-	if (eddystone_url_beacon(dev, 0xed, argv[1])<0)
+	if (eddystone_url_beacon(dev, 0xed, eurl, eurll)<0)
 		break;
 	sleep(1);
 	if (eddystone_uid_beacon(dev, 0xed, nid, bid)<0)

@@ -9,8 +9,6 @@ See https://github.com/google/eddystone/ for details about Eddystone.
 The only dependency at this time is bluetooth headers and library
 
 ## Todo/Bugs/Features:
-* Assumes https:// prefix, URL must be without
-* Does not encode suffixes yet
 * NID and BID are used as strings, add support for hex input
 * NID and BID defaults to 0123456789 ABCDEF
 * UID can not be set
@@ -24,5 +22,5 @@ Bluetooth LE requires root or capabilities set:
 * ./beacon url [NID BID]
 
 ## Examples:
-* ./beacon www.tal.org 
-* ./beacon www.tal.org 0123456789 ABCDEF
+* ./beacon https://www.tal.org/ 
+* ./beacon https://www.tal.org/ 0123456789 ABCDEF
