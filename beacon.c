@@ -46,8 +46,20 @@
 	} while(0)
 
 
+#define THERMAL_ZONE "/sys/devices/virtual/thermal/thermal_zone0/temp"
+
+struct eddystone_config {
+	char eurl[18];
+	int8_t eurll;
+	unsigned int temp;
+	long long int nid;
+	long long int bid;
+};
+
 int sec_cnt=0;
 int adv_cnt=0;
+
+static struct eddystone_config es;
 
 static struct sigaction sa_int;
 static int sigint_c=0;
@@ -100,6 +112,25 @@ if (setsockopt(dev, SOL_HCI, HCI_FILTER, &flt, sizeof(flt)) < 0) {
 }
 
 return 0;
+}
+
+int read_thermal_zone(void)
+{
+unsigned int t;
+int r;
+FILE *f;
+
+f=fopen(THERMAL_ZONE, "r");
+if (!f)
+	return 0;
+
+r=fscanf(f, "%ud", &t);
+if (r!=1)
+	t=0;
+
+fclose(f);
+
+return t;
 }
 
 int read_event(int dev)
@@ -289,16 +320,10 @@ f->data[10]=0xFE; // UUID
 f->data[11]=type; // Eddystone Frame Type
 }
 
-int eddystone_uid_beacon(int dev, uint8_t tx, const char *nid, const char *bid)
+int eddystone_uid_beacon(int dev, uint8_t tx, long long int nid, long long int bid)
 {
 int i;
 le_set_advertising_data_cp f;
-
-if (strlen(nid)!=10)
-	return -1;
-
-if (strlen(bid)!=6)
-	return -1;
 
 eddystone_frame_prepare(&f, 0x00);
 
@@ -307,17 +332,15 @@ f.data[7]=0x17; // Service Data Length
 f.data[12]=tx;
 
 for (i=0;i<10;i++)
-	f.data[13+i]=nid[i];
+	f.data[13+i]=(uint8_t)(nid >> ((9-i)*8));
 
 for (i=0;i<6;i++)
-	f.data[23+i]=bid[i];
-
-printf("UID Frame: %s %s\n", nid, bid);
+	f.data[23+i]=(uint8_t)(bid >> ((5-i)*8));
 
 return advertise_frame(dev, &f);
 }
 
-int eddystone_tlm_beacon(int dev)
+int eddystone_tlm_beacon(int dev, unsigned int temp)
 {
 le_set_advertising_data_cp f;
 
@@ -328,7 +351,7 @@ f.data[7]=0x11; // Total length
 f.data[12]=0x00; // TLM Frame Version
 f.data[13]=0x00; // VBatt1
 f.data[14]=0x00; // VBatt2
-f.data[15]=0x80; // Temp1
+f.data[15]=(uint8_t)(temp/1000); // Temp1
 f.data[16]=0x00; // Temp2
 f.data[17]=(uint8_t)(adv_cnt>>24); // Advertising PDU count
 f.data[18]=(uint8_t)(adv_cnt>>16);
@@ -338,8 +361,6 @@ f.data[21]=(uint8_t)(sec_cnt>>24); // Time since power-on or reboot
 f.data[22]=(uint8_t)(sec_cnt>>16);
 f.data[23]=(uint8_t)(sec_cnt>>8);
 f.data[24]=(uint8_t)(sec_cnt>>0);
-
-printf("TLM Frame: %d %d\n", adv_cnt, sec_cnt);
 
 return advertise_frame(dev, &f);
 }
@@ -373,8 +394,6 @@ for (i=0;i<len && i<18;i++) {
 
 f.data[7]=6+len-1; // adjust for prefix
 
-printf("URL Frame: %d\n", len);
-
 advertise_frame(dev, &f);
 
 read_event(dev);
@@ -406,26 +425,39 @@ if (msg)
 	printf("Error: %s\n", msg);
 
 printf("beacon url [nid bid]\n\n");
-printf("URL assumes https:// and must be max 17 characters\n");
-printf("NID must be 10 characters, BID must be 6 characters\n");
-printf("Example: www.example.ex 0123456789 abcdef\n\n");
+printf("URL requires protocol prefix https:// and must fit inside advertising packet\n");
+printf("NID must be 12 characters, BID must be 8 characters\n");
+printf("Example: www.example.ex 0x0123456789 0xabcdef\n\n");
 }
 
 int main(int argc, char *argv[])
 {
 int dev_id, dev, ctl, r;
 int oneshot=0;
-char *nid="0123456789";
-char *bid="abcdef";
 time_t ut;
+
+es.nid=0x1234567890;
+es.bid=0xABCDEF;
 
 if (argc<2) {
 	usage("Missing all arguments");
 	return 1;
 }
-if (argc==4 && strlen(argv[2])==10 && strlen(argv[3])==6) {
-	nid=argv[2];
-	bid=argv[3];
+if (argc==4 && strlen(argv[2])==12 && strlen(argv[3])==8) {
+	es.nid=strtoll(argv[2], NULL, 16);
+	if (es.nid<0 || es.nid>0xFFFFFFFFFF) {
+		usage("Invalid NID");
+		return 5;
+	}
+
+	es.bid=strtoll(argv[3], NULL, 16);
+	if (es.bid<0 || es.bid>0xFFFFFF) {
+		usage("Invalid BID");
+		return 5;
+	}
+} else if (argc==4) {
+	usage("Invalid BID or NID");
+	return 5;
 } else if (argc==3) {
 	usage("Meh");
 	return 2;
@@ -447,7 +479,7 @@ if (eurll==-1) {
 
 SETSIG(sa_int, SIGINT, sig_handler_sigint, SA_RESTART);
 
-printf("URL(%d): %s\nNID: %s\nBID: %s\n", eurll, argv[1], nid, bid);
+printf("URL(%d): %s\nNID: %llx\nBID: %llx\n", eurll, argv[1], es.nid, es.bid);
 
 dev = hci_open_dev(dev_id);
 if (dev<0) {
@@ -489,13 +521,15 @@ set_advertising(dev, 0x00A0, 0x0200);
 enable_advertise(dev, 1);
 
 while(1 || !oneshot) {
+	es.temp=read_thermal_zone();
+
 	if (eddystone_url_beacon(dev, 0xed, eurl, eurll)<0)
 		break;
 	sleep(1);
-	if (eddystone_uid_beacon(dev, 0xed, nid, bid)<0)
+	if (eddystone_uid_beacon(dev, 0xed, es.nid, es.bid)<0)
 		break;
 	sleep(1);
-	if (eddystone_tlm_beacon(dev)<0)
+	if (eddystone_tlm_beacon(dev, es.temp)<0)
 		break;
 	sleep(1);
 
