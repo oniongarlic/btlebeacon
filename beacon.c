@@ -149,7 +149,7 @@ hdr = (void *)(buf + 1);
 ptr = buf + (1 + HCI_EVENT_HDR_SIZE);
 len -= (1 + HCI_EVENT_HDR_SIZE);
 
-printf("> HCI Event: 0x%02x plen %d\n", hdr->evt, hdr->plen);
+//printf("> HCI Event: 0x%02x plen %d\n", hdr->evt, hdr->plen);
 
 return 0;
 }
@@ -430,11 +430,47 @@ printf("NID must be 12 characters, BID must be 8 characters\n");
 printf("Example: www.example.ex 0x0123456789 0xabcdef\n\n");
 }
 
+int beacon_loop(int dev, int oneshot)
+{
+time_t ut;
+int l=0;
+
+ut=time(NULL);
+
+while(1 || !oneshot) {
+	es.temp=read_thermal_zone();
+
+	switch (l) {
+	case 0:
+	if (eddystone_url_beacon(dev, 0xed, eurl, eurll)<0)
+		return -1;
+	break;
+	case 1:
+	if (eddystone_uid_beacon(dev, 0xed, es.nid, es.bid)<0)
+		return -1;
+	break;
+	case 2:
+	if (eddystone_tlm_beacon(dev, es.temp)<0)
+		return -1;
+	break;
+	default:
+		l=0;
+		continue;
+	}
+	l++;
+	sleep(1);
+	sec_cnt=time(NULL)-ut;
+	adv_cnt++;
+	if (sigint_c>0)
+		return 0;
+}
+
+}
+
 int main(int argc, char *argv[])
 {
 int dev_id, dev, ctl, r;
 int oneshot=0;
-time_t ut;
 
 es.nid=0x1234567890;
 es.bid=0xABCDEF;
@@ -509,8 +545,6 @@ if (dev_id<0) {
 	return 1;
 }
 
-ut=time(NULL);
-
 hci_le_set_scan_enable(dev, 0x00, 1, 1000);
 
 setup_filter(dev);
@@ -520,27 +554,11 @@ set_advertising(dev, 0x00A0, 0x0200);
 
 enable_advertise(dev, 1);
 
-while(1 || !oneshot) {
-	es.temp=read_thermal_zone();
-
-	if (eddystone_url_beacon(dev, 0xed, eurl, eurll)<0)
-		break;
-	sleep(1);
-	if (eddystone_uid_beacon(dev, 0xed, es.nid, es.bid)<0)
-		break;
-	sleep(1);
-	if (eddystone_tlm_beacon(dev, es.temp)<0)
-		break;
-	sleep(1);
-
-	sec_cnt=time(NULL)-ut;;
-	adv_cnt++;
-
-	if (sigint_c>0)
-		break;
-}
+r=beacon_loop(dev, oneshot);
 
 enable_advertise(dev, 0);
 
 hci_close_dev(dev);
+
+return r;
 }
