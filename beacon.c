@@ -518,6 +518,12 @@ SETSIG(sa_int, SIGINT, sig_handler_sigint, SA_RESTART);
 printf("URL(%d): %s\nNID: %llx\nBID: %llx\n", eurll, argv[1], es.nid, es.bid);
 #endif
 
+dev_id=hci_get_route(NULL);
+if (dev_id<0) {
+	perror("hci_dev_route");
+	return 1;
+}
+
 dev = hci_open_dev(dev_id);
 if (dev<0) {
 	perror("hci_open_dev");
