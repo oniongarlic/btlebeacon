@@ -97,7 +97,6 @@ static const char* eddystone_url_suffix[] = {
 void sig_handler_sigint(int i)
 {
 sigint_c++;
-fprintf(stderr, "SIGINT: %d\n", sigint_c);
 }
 
 int setup_filter(int dev)
@@ -515,7 +514,9 @@ if (eurll==-1) {
 
 SETSIG(sa_int, SIGINT, sig_handler_sigint, SA_RESTART);
 
+#ifdef DEBUG
 printf("URL(%d): %s\nNID: %llx\nBID: %llx\n", eurll, argv[1], es.nid, es.bid);
+#endif
 
 dev = hci_open_dev(dev_id);
 if (dev<0) {
